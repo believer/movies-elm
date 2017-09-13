@@ -16,7 +16,18 @@ body {
   padding: 0;
 }
 
+.movies__movie {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 200ms ease-in-out;
+}
+
+.movies__movie:hover {
+  opacity: 1;
+}
+
 .movies__movie-poster {
+  border-radius: 3px;
   width: 100%;
 }
 
@@ -25,4 +36,27 @@ body {
   display: flex;
   justify-content: space-between;
   padding-top: 10px;
+}
+
+.selected {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 60px;
+  max-width: 960px;
+}
+
+.selected-movie {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-column-gap: 20px;
+  margin-top: 30px;
+}
+
+.selected-movie__poster {
+  width: 100%;
+}
+
+.selected-movie__title {
+  font-size: 32px;
+  margin-top: 0;
 }

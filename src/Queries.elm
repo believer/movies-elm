@@ -10,6 +10,8 @@ movieQuery =
             poster
             rating
             view_date
+            tagline
+            runtime
         }
     }
     """
