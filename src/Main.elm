@@ -5,8 +5,8 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Attributes.Aria exposing (..)
 import Html.Events exposing (onClick)
-import Json.Decode as Decode
-import Json.Decode.Pipeline as Pipeline
+import Json.Decode as JD exposing (int, string, float, nullable, Decoder)
+import Json.Decode.Pipeline as Pipeline exposing (decode, required, optional, hardcoded)
 import Queries exposing (..)
 import Date exposing (..)
 import Date.Extra as DE
@@ -17,7 +17,8 @@ import Navigation
 
 
 type alias Movie =
-    { title : String
+    { id : String
+    , title : String
     , poster : String
     , rating : Int
     , runtime : Int
@@ -43,26 +44,40 @@ baseUrl =
     "http://movies-graphql-postgres.a8a18d40.svc.dockerapp.io:3000/graphql?query="
 
 
-movieDecoder : Decode.Decoder Movie
+movieDecoder : Decoder Movie
 movieDecoder =
-    Pipeline.decode Movie
-        |> Pipeline.required "title" Decode.string
-        |> Pipeline.required "poster" Decode.string
-        |> Pipeline.required "rating" Decode.int
-        |> Pipeline.required "runtime" Decode.int
-        |> Pipeline.required "tagline" Decode.string
-        |> Pipeline.required "view_date" Decode.string
+    decode Movie
+        |> Pipeline.required "id" string
+        |> Pipeline.required "title" string
+        |> Pipeline.required "poster" string
+        |> Pipeline.optional "rating" int 0
+        |> Pipeline.required "runtime" int
+        |> Pipeline.required "tagline" string
+        |> Pipeline.optional "view_date" string "0000-01-01"
 
 
-request : Http.Request (List Movie)
-request =
+feedRequest : Http.Request (List Movie)
+feedRequest =
     let
         encodedQuery =
-            Http.encodeUri Queries.movieQuery
+            Http.encodeUri Queries.feedQuery
 
         decoder =
-            Decode.at [ "data", "feed" ] <|
-                Decode.list movieDecoder
+            JD.at [ "data", "feed" ] <|
+                JD.list movieDecoder
+    in
+        Http.get (baseUrl ++ encodedQuery) decoder
+
+
+movieRequest : Movie -> Http.Request (List Movie)
+movieRequest movie =
+    let
+        encodedQuery =
+            Http.encodeUri Queries.movieQuery ++ "&variables={\"movieId\":" ++ movie.id ++ "}"
+
+        decoder =
+            JD.at [ "data", "movies" ] <|
+                JD.list movieDecoder
     in
         Http.get (baseUrl ++ encodedQuery) decoder
 
@@ -73,6 +88,7 @@ request =
 
 type Msg
     = FetchMovies (Result Http.Error Movies)
+    | FetchMovie (Result Http.Error Movies)
     | SelectMovie Movie
     | ResetSelectedMovie
     | UrlChange Navigation.Location
@@ -87,8 +103,14 @@ update msg model =
         FetchMovies (Err err) ->
             ( { model | error = toString err }, Cmd.none )
 
+        FetchMovie (Ok movies) ->
+            ( { model | selectedMovie = List.head movies }, Cmd.none )
+
+        FetchMovie (Err err) ->
+            ( { model | error = toString err }, Cmd.none )
+
         SelectMovie movie ->
-            ( { model | selectedMovie = Just movie }, Cmd.none )
+            ( model, Http.send FetchMovie (movieRequest movie) )
 
         ResetSelectedMovie ->
             ( { model | selectedMovie = Nothing }, Cmd.none )
@@ -137,7 +159,6 @@ listItem movie =
             , src ("https://image.tmdb.org/t/p/w500" ++ movie.poster)
             ]
             []
-        , a [ href "#test" ] [ text "Test" ]
         , div [ class "movies__movie-content" ]
             [ text movie.title
             , b [] [ text (toString movie.rating) ]
@@ -195,7 +216,7 @@ view model =
 init : Navigation.Location -> ( Model, Cmd Msg )
 init location =
     ( Model [ location ] [] "" Nothing
-    , Http.send FetchMovies request
+    , Http.send FetchMovies feedRequest
     )
 
 
